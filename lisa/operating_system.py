@@ -207,6 +207,7 @@ class OperatingSystem:
         ...
 
     @classmethod
+    @retry(tries=10, delay=6)
     def _get_detect_string(cls, node: Any) -> Iterable[str]:
         typed_node: Node = node
         cmd_result = typed_node.execute(cmd="wcscli", no_error_log=True)
@@ -950,7 +951,7 @@ class Debian(Linux):
                     raise RepoNotExistException(self._node.os)
         result.assert_exit_code(message="\n".join(self.get_apt_error(result.stdout)))
 
-    @retry(tries=10, delay=5)
+    @retry(tries=30, delay=10)
     def _install_packages(
         self,
         packages: List[str],

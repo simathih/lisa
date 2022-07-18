@@ -40,14 +40,17 @@ class Hwclock(Tool):
             expected_exit_code_failure_message="fail to set date",
         )
 
-    @retry(exceptions=LisaException, tries=20, delay=0.5)
+    @retry(exceptions=LisaException, tries=20, delay=1)
     def get(self, no_error_log: bool = True) -> datetime:
         command_result = self.run(
             no_error_log=no_error_log,
             force_run=True,
             sudo=True,
-            timeout=10,
-            expected_exit_code=0,
-            expected_exit_code_failure_message="fail to get date",
+            timeout=60,
         )
+        if command_result.exit_code != 0:
+            raise LisaException(
+                f"fail to run hwclock, output: {command_result.stdout},"
+                f" error: {command_result.stderr}"
+            )
         return parser().parse(command_result.stdout)
