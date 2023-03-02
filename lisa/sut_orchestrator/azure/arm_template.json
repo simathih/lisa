@@ -583,7 +583,7 @@
                             },
                             "caching": "ReadOnly",
                             "createOption": "FromImage",
-                            "diskSizeGB": 138
+                            "diskSizeGB": 180
                         }
                     }
                 },
