@@ -147,6 +147,7 @@ deployment.
             location: "<one or multiple locations, split by comma>"
             vm_size: "<vm size>"
             maximize_capability: "<true or false>"
+            osdisk_size_in_gb: <disk size in gb>
 
 * **virtual_network_resource_group**. Specify if an existing virtual network
   should be used. If `virtual_network_resource_group` is not provided, a virtual
@@ -179,6 +180,9 @@ deployment.
   run all test cases. Notice, there are some features are conflict by natural,
   so some test cases may not be picked up. This setting is useful to force run
   perf tests on not designed VM sizes.
+* **osdisk_size_in_gb** is used to specify the minimum size of the OS disk. The size
+  of disk may be larger depending on other requirements set by vhd, shared image gallery
+  or marketplace image.
 
 Run on Ready computers
 ----------------------
