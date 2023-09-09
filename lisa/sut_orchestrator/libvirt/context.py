@@ -38,6 +38,9 @@ class NodeContext:
     vm_name: str = ""
     firmware_source_path: str = ""
     firmware_path: str = ""
+    guest_vm_type: str = ""
+    igvm_source_path: str = ""
+    igvm_path: str = "/usr/share/cloud-hypervisor/cvm/linux-ttyS0.bin"
     cloud_init_file_path: str = ""
     ignition_file_path: str = ""
     os_disk_source_file_path: Optional[str] = None

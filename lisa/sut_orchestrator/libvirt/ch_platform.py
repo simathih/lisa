@@ -3,6 +3,7 @@
 
 import os
 import re
+import secrets
 import xml.etree.ElementTree as ET  # noqa: N817
 from pathlib import Path
 from typing import List, Type
@@ -65,6 +66,11 @@ class CloudHypervisorPlatform(BaseLibvirtPlatform):
         else:
             node_context.firmware_path = node_runbook.firmware
 
+        if node_context.igvm_source_path:
+            node_context.igvm_path = os.path.join(
+                self.vm_disks_dir, os.path.basename(node_context.igvm_source_path)
+            )
+
     def _create_node(
         self,
         node: Node,
@@ -76,6 +82,12 @@ class CloudHypervisorPlatform(BaseLibvirtPlatform):
             self.host_node.shell.copy(
                 Path(node_context.firmware_source_path),
                 Path(node_context.firmware_path),
+            )
+
+        if node_context.igvm_source_path:
+            self.host_node.shell.copy(
+                Path(node_context.igvm_source_path),
+                Path(node_context.igvm_path),
             )
 
         super()._create_node(
@@ -114,8 +126,18 @@ class CloudHypervisorPlatform(BaseLibvirtPlatform):
         os_type = ET.SubElement(os, "type")
         os_type.text = "hvm"
 
-        os_kernel = ET.SubElement(os, "kernel")
-        os_kernel.text = node_context.firmware_path
+        if node_context.guest_vm_type == "NON-CVM":
+            os_kernel = ET.SubElement(os, "kernel")
+            os_kernel.text = node_context.firmware_path
+        else:
+            os_kernel = ET.SubElement(os, "igvm")
+            os_kernel.text = node_context.igvm
+
+            os_kernel = ET.SubElement(os, "snp")
+            os_kernel.text = "on"
+
+            os_kernel = ET.SubElement(os, "host_data")
+            os_kernel.text = secrets.token_hex(32)
 
         devices = ET.SubElement(domain, "devices")
 
@@ -154,6 +176,7 @@ class CloudHypervisorPlatform(BaseLibvirtPlatform):
         )
 
         xml = ET.tostring(domain, "unicode")
+        self._log.debug(f"libvirt xml: {xml}")
         return xml
 
     def _get_domain_undefine_flags(self) -> int:

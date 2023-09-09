@@ -26,6 +26,7 @@ from lisa.feature import Feature
 from lisa.node import Node, RemoteNode, local_node_connect
 from lisa.operating_system import CBLMariner
 from lisa.platform_ import Platform
+from lisa.sut_orchestrator.libvirt.features import SecurityProfile  # type: ignore
 from lisa.tools import (
     Chmod,
     Chown,
@@ -88,6 +89,7 @@ class BaseLibvirtPlatform(Platform, IBaseLibvirtPlatform):
     _supported_features: List[Type[Feature]] = [
         SerialConsole,
         StartStop,
+        SecurityProfile,
     ]
 
     def __init__(self, runbook: schema.Platform) -> None:
@@ -308,6 +310,7 @@ class BaseLibvirtPlatform(Platform, IBaseLibvirtPlatform):
             is_allow_set=True,
             items=[
                 schema.FeatureSettings.create(SerialConsole.name()),
+                schema.FeatureSettings.create(SecurityProfile.name()),
             ],
         )
 
@@ -544,8 +547,26 @@ class BaseLibvirtPlatform(Platform, IBaseLibvirtPlatform):
         log: Logger,
     ) -> None:
         self.host_node.shell.mkdir(Path(self.vm_disks_dir), exist_ok=True)
-
+        features_settings: Dict[str, schema.FeatureSettings] = {}
         for node in environment.nodes.list():
+            self._log.debug(f"==>node: {node.name}")
+            if node.capability.features:
+                self._log.debug(f"==>node.capability.features: {node.capability.features}")
+                for f in node.capability.features:
+                    if f.type not in features_settings:
+                        self._log.debug(f"==>f.type: {f.type}")
+                        features_settings[f.type] = f
+
+            for f in features_settings.values():
+                feature_type = next(
+                    x for x in self.supported_features() if x.name() == f.type
+                )
+                self._log.debug(f"==>f: {f}")
+                feature_type.on_before_deployment(
+                    environment=environment,
+                    log=log,
+                    settings=f,
+                )
             node_context = get_node_context(node)
             self._create_node(
                 node,
