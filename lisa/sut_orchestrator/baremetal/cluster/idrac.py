@@ -38,11 +38,13 @@ class Idrac(Cluster):
             password=self.idrac_runbook.password,
         )
         self._login()
-        self._change_boot_order_once("VCD-DVD")
         for client in self.idrac_runbook.client:
             assert client.iso_http_url, "iso_http_url is required for idrac client"
             self._insert_virtual_media(client.iso_http_url)
+            self._change_boot_order_once("VCD-DVD")
             self._reboot()
+            time.sleep(120)
+
 
     def _login(self) -> None:
         self.redfish_instance.login(auth="session")
