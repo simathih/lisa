@@ -10,7 +10,7 @@ from lisa.util.logger import get_logger
 
 from ..platform_ import BareMetalPlatform
 from ..schema import RackManagerSchema
-from .cluster import Cluster
+from .cluster import Cluster, ClusterCapabilities
 
 
 class RackManagerStartStop(features.StartStop):
@@ -70,3 +70,9 @@ class RackManager(Cluster):
             rm_node.execute(f"set system {operation} -i {client.management_port}")
 
         self._log.debug(f"client has been {operation} successfully")
+
+    def get_cluster_capabilities(self) -> ClusterCapabilities:
+        cluster_capabilities = ClusterCapabilities()
+        cluster_capabilities.core_count = 8
+        cluster_capabilities.free_memory_mb = 32 * 1024
+        return cluster_capabilities

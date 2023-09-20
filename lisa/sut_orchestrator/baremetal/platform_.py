@@ -14,7 +14,7 @@ from lisa.util.subclasses import Factory
 
 from .. import BAREMETAL
 from .build import Build
-from .cluster.cluster import Cluster
+from .cluster.cluster import Cluster, ClusterCapabilities
 from .context import get_build_context, get_node_context
 from .features import SerialConsole, StartStop
 from .ip_getter import IpGetterChecker
@@ -54,16 +54,17 @@ class BareMetalPlatform(Platform):
         self.build_factory = Factory[Build](Build)
 
     def _prepare_environment(self, environment: Environment, log: Logger) -> bool:
-        return self._configure_node_capabilities(environment, log)
-
-    def _deploy_environment(self, environment: Environment, log: Logger) -> None:
         # currently only support one cluster
         assert self._baremetal_runbook.cluster, "no cluster is specified in the runbook"
-        cluster_instance = self._baremetal_runbook.cluster[0]
+        self.cluster_instance = self._baremetal_runbook.cluster[0]
 
-        self.cluster = self.cluster_factory.create_by_runbook(cluster_instance)
+        self.cluster = self.cluster_factory.create_by_runbook(self.cluster_instance)
         assert self.cluster.runbook.client, "no client is specified in the runbook"
+        return self._configure_node_capabilities(
+            environment, log, self.cluster.get_cluster_capabilities()
+        )
 
+    def _deploy_environment(self, environment: Environment, log: Logger) -> None:
         # copy build (shared, check if it's copied)
         if self._baremetal_runbook.source:
             if not self.local_artifacts_path:
@@ -83,9 +84,9 @@ class BareMetalPlatform(Platform):
 
         ready_checker: Optional[ReadyChecker] = None
         # ready checker cleanup
-        if cluster_instance.ready_checker:
+        if self.cluster_instance.ready_checker:
             ready_checker = self.ready_checker_factory.create_by_runbook(
-                cluster_instance.ready_checker
+                self.cluster_instance.ready_checker
             )
             ready_checker.clean_up()
 
@@ -143,9 +144,9 @@ class BareMetalPlatform(Platform):
         # deploy cluster
         self.cluster.deploy(environment)
 
-        if cluster_instance.ready_checker:
+        if self.cluster_instance.ready_checker:
             ready_checker = self.ready_checker_factory.create_by_runbook(
-                cluster_instance.ready_checker
+                self.cluster_instance.ready_checker
             )
 
         for index, node in enumerate(environment.nodes.list()):
@@ -156,9 +157,9 @@ class BareMetalPlatform(Platform):
                 ready_checker.is_ready(node)
 
             # get ip address
-            if cluster_instance.ip_getter:
+            if self.cluster_instance.ip_getter:
                 ip_getter = self.ip_getter_factory.create_by_runbook(
-                    cluster_instance.ip_getter
+                    self.cluster_instance.ip_getter
                 )
                 node_context.connection.address = ip_getter.get_ip()
 
@@ -185,12 +186,15 @@ class BareMetalPlatform(Platform):
             self._log.debug("no copied source path specified, skip copy")
 
     def _configure_node_capabilities(
-        self, environment: Environment, log: Logger
+        self,
+        environment: Environment,
+        log: Logger,
+        cluster_capabilities: ClusterCapabilities,
     ) -> bool:
         if not environment.runbook.nodes_requirement:
             return True
 
-        nodes_capabilities = self._create_node_capabilities()
+        nodes_capabilities = self._create_node_capabilities(cluster_capabilities)
 
         nodes_requirement = []
         for node_space in environment.runbook.nodes_requirement:
@@ -203,11 +207,16 @@ class BareMetalPlatform(Platform):
         environment.runbook.nodes_requirement = nodes_requirement
         return True
 
-    def _create_node_capabilities(self) -> schema.NodeSpace:
+    def _create_node_capabilities(
+        self, cluster_capabilities: ClusterCapabilities
+    ) -> schema.NodeSpace:
         node_capabilities = schema.NodeSpace()
         node_capabilities.name = "baremetal"
         node_capabilities.node_count = 1
-        node_capabilities.core_count = search_space.IntRange(min=1, max=1)
+        node_capabilities.core_count = search_space.IntRange(
+            min=1, max=cluster_capabilities.core_count
+        )
+        node_capabilities.memory_mb = cluster_capabilities.free_memory_mb
         node_capabilities.disk = schema.DiskOptionSettings(
             data_disk_count=search_space.IntRange(min=0),
             data_disk_size=search_space.IntRange(min=1),

@@ -18,7 +18,7 @@ from lisa.util.perf_timer import create_timer
 
 from ..platform_ import BareMetalPlatform
 from ..schema import ClusterSchema, IdracSchema
-from .cluster import Cluster
+from .cluster import Cluster, ClusterCapabilities
 
 
 class IdracStartStop(features.StartStop):
@@ -131,6 +131,21 @@ class Idrac(Cluster):
             timeout_message="wait for client into 'On' state",
         )
         self.logout()
+
+    def get_cluster_capabilities(self) -> ClusterCapabilities:
+        self.login()
+        response = self.redfish_instance.get(
+            "/redfish/v1/Systems/System.Embedded.1/",
+        )
+        cluster_capabilities = ClusterCapabilities()
+        cluster_capabilities.core_count = int(
+            response.dict["ProcessorSummary"]["LogicalProcessorCount"]
+        )
+        cluster_capabilities.free_memory_mb = (
+            int(response.dict["MemorySummary"]["TotalSystemMemoryGiB"]) * 1024
+        )
+        self.logout()
+        return cluster_capabilities
 
     def get_serial_console_log(self) -> str:
         response = self.redfish_instance.post(

@@ -11,6 +11,12 @@ from lisa.util.logger import get_logger
 from ..schema import ClusterSchema
 
 
+class ClusterCapabilities:
+    def __init__(self) -> None:
+        self.core_count = 0
+        self.free_memory_mb = 0
+
+
 class Cluster(subclasses.BaseClassWithRunbookMixin, InitializableMixin):
     def __init__(
         self,
@@ -34,4 +40,7 @@ class Cluster(subclasses.BaseClassWithRunbookMixin, InitializableMixin):
         raise NotImplementedError()
 
     def get_start_stop(self) -> Type[features.StartStop]:
+        raise NotImplementedError()
+
+    def get_cluster_capabilities(self) -> ClusterCapabilities:
         raise NotImplementedError()
