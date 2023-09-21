@@ -130,13 +130,7 @@ class Node(subclasses.BaseClassWithRunbookMixin, ContextMixin, InitializableMixi
         # check if password is required when running command with sudo
         require_sudo_password = False
         if self.is_remote and self.is_posix:
-            process = self._execute(
-                f"echo {constants.LISA_TEST_FOR_SUDO}",
-                shell=True,
-                sudo=True,
-                no_info_log=True,
-            )
-            result = process.wait_result(10)
+            result = self._execute_sudo_test()
             if result.exit_code != 0:
                 for prompt in self._sudo_passwrod_prompts:
                     if prompt in result.stdout:
@@ -160,23 +154,48 @@ class Node(subclasses.BaseClassWithRunbookMixin, ContextMixin, InitializableMixi
                 # So check twice to get two kinds of prompt
                 password_prompts = []
                 for i in range(1, 3):
-                    process = self._execute(
-                        f"echo {constants.LISA_TEST_FOR_SUDO}",
-                        shell=True,
-                        sudo=True,
-                        no_info_log=True,
-                    )
-                    result = process.wait_result(10)
+                    result = self._execute_sudo_test()
                     if result.exit_code != 0:
-                        raise RequireUserPasswordException(
-                            "The password might be invalid for running sudo command"
-                        )
+                        # The password might be invalid for running sudo command
+                        # Try to reset password and check again
+                        is_successfull = self._is_password_reset_successful()
+                        if is_successfull:
+                            result = self._execute_sudo_test()
+                        if not is_successfull or result.exit_code != 0:
+                            raise RequireUserPasswordException(
+                                "The password might be invalid for running sudo command"
+                            )
                     password_prompt = result.stdout.replace(
                         f"{constants.LISA_TEST_FOR_SUDO}", ""
                     )
                     password_prompts.append(password_prompt)
                     self.log.debug(f"password prompt {i}: {password_prompt}")
                 ssh_shell.password_prompts = password_prompts
+
+    def _execute_sudo_test(self) -> ExecutableResult:
+        process = self._execute(
+            f"echo {constants.LISA_TEST_FOR_SUDO}",
+            shell=True,
+            sudo=True,
+            no_info_log=True,
+        )
+        return process.wait_result(10)
+
+    def _is_password_reset_successful(self) -> bool:
+        from lisa.features import PasswordExtension
+
+        if self.features.is_supported(PasswordExtension):
+            ssh_shell = cast(SshShell, self.shell)
+            username = ssh_shell.connection_info.username
+            password = ssh_shell.connection_info.password
+            password_extension = self.features[PasswordExtension]
+            try:
+                password_extension.reset_password(username, str(password))
+            except Exception as identifier:
+                self.log.debug(f"reset password failed: {identifier}")
+                return False
+            return True
+        return False
 
     @property
     def is_connected(self) -> bool:
