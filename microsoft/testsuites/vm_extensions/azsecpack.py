@@ -12,6 +12,7 @@ from lisa import (
     TestSuiteMetadata,
     simple_requirement,
 )
+from azure.core.exceptions import HttpResponseError
 from lisa.operating_system import BSD, Posix
 from lisa.sut_orchestrator.azure.common import (
     add_tag_for_vm,
@@ -24,7 +25,7 @@ from lisa.sut_orchestrator.azure.platform_ import AzurePlatform
 from lisa.sut_orchestrator.azure.tools import Azsecd
 from lisa.testsuite import TestResult
 from lisa.tools import Cat, Journalctl, Service
-from lisa.util import LisaException, UnsupportedDistroException
+from lisa.util import LisaException, SkippedException, UnsupportedDistroException
 
 
 @TestSuiteMetadata(
@@ -104,10 +105,17 @@ class AzSecPack(TestSuite):
         # Assign the user assigned managed identity to the VM
         add_user_assign_identity(platform, resource_group_name, vm_name, msi.id, log)
 
-        # Install agent extension
-        self._install_monitor_agent_extension(node)
-        self._install_security_agent_extension(node, log)
+        # mdsd should be installed fisrtly
         self._install_mdsd(node, log)
+        # Install agent extension
+        try:
+            self._install_monitor_agent_extension(node)
+            self._install_security_agent_extension(node, log)
+        except HttpResponseError as identifier:
+            if "OS is not supported" in str(identifier):
+                raise SkippedException(f"unsupported Linux distro: {node.os}")
+            else:
+                raise identifier
 
         # Check and verify
         self._check_mdsd_service_status(node, log)
@@ -216,7 +224,7 @@ class AzSecPack(TestSuite):
         azsec_services = ["azsecd", "azsecmond", "auoms"]
         for azsec_service in azsec_services:
             assert_that(service.check_service_status(azsec_service)).described_as(
-                f"{azsec_service}is not running successfully"
+                f"{azsec_service} is not running successfully"
             ).is_equal_to(True)
             log.info(f"{azsec_service} is running successfully")
 
