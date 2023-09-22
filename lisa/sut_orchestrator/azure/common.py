@@ -20,8 +20,12 @@ from azure.keyvault.certificates import (
     KeyVaultCertificate,
 )
 from azure.keyvault.secrets import SecretClient
-from azure.mgmt.compute import ComputeManagementClient  # type: ignore
-from azure.mgmt.compute.models import VirtualMachine  # type: ignore
+from azure.mgmt.compute import ComputeManagementClient
+from azure.mgmt.compute.models import (
+    NetworkInterfaceReference,
+    NetworkProfile,
+    VirtualMachine,
+)
 from azure.mgmt.keyvault import KeyVaultManagementClient
 from azure.mgmt.keyvault.models import (
     AccessPolicyEntry,
@@ -1591,7 +1595,10 @@ def get_primary_ip_addresses(
     platform: "AzurePlatform", resource_group_name: str, vm: VirtualMachine
 ) -> Tuple[str, str]:
     network_client = get_network_client(platform)
+    assert isinstance(vm.network_profile, NetworkProfile)
+    assert isinstance(vm.network_profile.network_interfaces, List)
     for network_interface in vm.network_profile.network_interfaces:
+        assert isinstance(network_interface.id, str)
         nic_name = get_matched_str(network_interface.id, NIC_NAME_PATTERN)
         nic = network_client.network_interfaces.get(resource_group_name, nic_name)
         if nic.primary:

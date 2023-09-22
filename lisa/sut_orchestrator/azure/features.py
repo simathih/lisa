@@ -20,7 +20,7 @@ from azure.core.exceptions import (
     ResourceNotFoundError,
     map_error,
 )
-from azure.mgmt.compute.models import (  # type: ignore
+from azure.mgmt.compute.models import (
     DiskCreateOption,
     DiskCreateOptionTypes,
     HardwareProfile,
@@ -750,6 +750,7 @@ class NetworkInterface(AzureFeatureMixin, features.NetworkInterface):
         sriov_enabled: bool = False
         vm = get_vm(azure_platform, self._node)
         nic = self._get_primary(vm.network_profile.network_interfaces)
+        assert nic.id, "'nic.id' must not be 'None'"
         nic_name = nic.id.split("/")[-1]
         primary_nic = network_client.network_interfaces.get(
             self._resource_group_name, nic_name
@@ -784,6 +785,7 @@ class NetworkInterface(AzureFeatureMixin, features.NetworkInterface):
                 f" it exceeds the vm size's capability {node_capability_nic_count}."
             )
         nic = self._get_primary(vm.network_profile.network_interfaces)
+        assert nic.id, "'nic.id' must not be 'None'"
         nic_name = nic.id.split("/")[-1]
         primary_nic = network_client.network_interfaces.get(
             self._resource_group_name, nic_name
@@ -852,6 +854,7 @@ class NetworkInterface(AzureFeatureMixin, features.NetworkInterface):
             self._log.debug("No existed extra nics can be disassociated.")
             return
         nic = self._get_primary(vm.network_profile.network_interfaces)
+        assert nic.id, "'nic.id' must not be 'None'"
         nic_name = nic.id.split("/")[-1]
         primary_nic = network_client.network_interfaces.get(
             self._resource_group_name, nic_name
